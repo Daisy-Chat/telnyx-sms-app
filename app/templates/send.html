@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Send SMS</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</head>
+<body class="container mt-4">
+    <h1>Send a New SMS</h1>
+    <form method="post" action="/send-sms">
+        <div class="mb-3">
+            <label for="to" class="form-label">To:</label>
+            <input type="text" class="form-control" id="to" name="to" placeholder="+1234567890" required>
+        </div>
+        <div class="mb-3">
+            <label for="message" class="form-label">Message:</label>
+            <textarea class="form-control" id="message" name="message" rows="4" required></textarea>
+        </div>
+        <button type="submit" class="btn btn-success">Send</button>
+        <a href="/" class="btn btn-secondary ms-2">Back</a>
+    </form>
+</body>
+</html>

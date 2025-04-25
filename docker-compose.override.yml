@@ -1,0 +1,7 @@
+version: '3.8'
+
+services:
+  sms-app:
+    build:
+      args:
+        BUILD_TAG: ${APP_VERSION}

@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  sms-app:
+    container_name: telnyx_sms_app
+    image: telnyx_sms_app:${APP_VERSION}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${APP_PORT}:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
