@@ -79,13 +79,22 @@ async def send_sms(request: Request, to: str = Form(...), message: str = Form(..
         "messaging_profile_id": TELNYX_MESSAGING_PROFILE_ID
     }
 
-    error_detail = None  # ✅ Always define it early!
+    error_detail = None
+    cost = None
 
     async with httpx.AsyncClient() as client:
         response = await client.post(url, json=payload, headers=headers)
 
     if response.status_code in [200, 202]:
-        save_message("outgoing", TELNYX_FROM_NUMBER, to, message, datetime.utcnow().isoformat(), status="sent")
+        try:
+            resp_json = response.json()
+            cost = resp_json.get("data", {}).get("cost", None)
+            if isinstance(cost, dict):
+                cost = None
+        except Exception:
+            cost = None
+
+        save_message("outgoing", TELNYX_FROM_NUMBER, to, message, datetime.utcnow().isoformat(), status="sent", cost=cost)
         request.session['flash'] = {"type": "success", "message": "Message sent successfully!"}
     else:
         try:
@@ -93,43 +102,31 @@ async def send_sms(request: Request, to: str = Form(...), message: str = Form(..
         except Exception:
             error_detail = response.text or "Unknown send error"
 
-        save_message(
-            "outgoing",
-            TELNYX_FROM_NUMBER,
-            to,
-            message,
-            datetime.utcnow().isoformat(),
-            status="failed",
-            error_message=error_detail
-        )
+        save_message("outgoing", TELNYX_FROM_NUMBER, to, message, datetime.utcnow().isoformat(), status="failed", error_message=error_detail)
         request.session['flash'] = {"type": "danger", "message": f"Failed to send message: {error_detail}"}
 
     return RedirectResponse("/", status_code=303)
 
+
 @app.post("/webhook")
 async def webhook(request: Request):
-    signature = request.headers.get("telnyx-signature-ed25519")
-    timestamp = request.headers.get("telnyx-timestamp")
+    payload = await request.json()
 
-    if not signature or not timestamp:
-        raise HTTPException(status_code=400, detail="Missing Telnyx signature headers")
+    event_type = payload.get("data", {}).get("event_type")
+    message_id = payload.get("data", {}).get("id")
+    cost = payload.get("data", {}).get("cost")
 
-    body = await request.body()
+    if event_type in ["message.delivery.successful", "message.delivery.failed"]:
+        # Here you can UPDATE your database
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
 
-    if not verify_telnyx_signature(signature, timestamp, body):
-        raise HTTPException(status_code=400, detail="Invalid webhook signature")
+        if cost:
+            cursor.execute("UPDATE messages SET cost = ? WHERE id = ?", (cost, message_id))
+            conn.commit()
+        conn.close()
 
-    data = await request.json()
-    payload = data.get("data", {}).get("payload", {})
-
-    from_number = payload.get("from", {}).get("phone_number")
-    to_number = payload.get("to", {}).get("phone_number")
-    body_text = payload.get("text")
-
-    if from_number and to_number and body_text:
-        save_message("incoming", from_number, to_number, body_text, datetime.utcnow().isoformat())
-
-    return {"message": "Webhook received securely"}
+    return {"status": "ok"}
 
 @app.get("/messages")
 async def api_messages(credentials: HTTPBasicCredentials = Depends(authenticate)):

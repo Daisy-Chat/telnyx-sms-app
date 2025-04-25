@@ -1,35 +1,36 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
     <title>Telnyx SMS Messages</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
     <script>
         var refreshInterval = "{{ refresh_interval }}";
         refreshInterval = parseInt(refreshInterval || "10");
-    
+
         let shouldRefresh = true;
         let inactivityTimer = null;
-    
+
         async function refreshMessages() {
             if (!shouldRefresh) {
                 console.log("Paused auto-refresh due to user activity.");
                 return;
             }
-    
+
             document.getElementById('spinner').classList.remove('d-none');
             try {
-                const response = await fetch('/messages', {
-                    credentials: 'same-origin'
-                });
+                const response = await fetch('/messages', { credentials: 'same-origin' });
                 const data = await response.json();
-    
+
                 let tableBody = document.getElementById('messagesBody');
                 tableBody.innerHTML = '';
-    
+
                 data.messages.forEach(msg => {
                     const errorMessage = msg[7] ? `<div class="small text-danger mt-1">${msg[7]}</div>` : '';
-    
+                    const costText = msg[8] ? `$${parseFloat(msg[8]).toFixed(4)}` : '-';
+
                     const row = `<tr>
                         <td>${msg[0]}</td>
                         <td>${msg[1]}</td>
@@ -45,6 +46,7 @@
                                     : `<span class="badge bg-secondary">Unknown</span>`
                             }
                         </td>
+                        <td>${costText}</td>
                         <td>
                             ${(msg[1] === "outgoing" && msg[6] === "failed")
                                 ? `<a href="/resend/${msg[0]}" class="btn btn-sm btn-warning">Resend</a>`
@@ -54,13 +56,13 @@
                     </tr>`;
                     tableBody.innerHTML += row;
                 });
-    
+
             } catch (error) {
                 console.error('Error refreshing messages:', error);
             }
             document.getElementById('spinner').classList.add('d-none');
         }
-    
+
         function pauseAutoRefresh() {
             shouldRefresh = false;
             if (inactivityTimer) {
@@ -69,20 +71,19 @@
             inactivityTimer = setTimeout(() => {
                 shouldRefresh = true;
                 console.log("Resumed auto-refresh after inactivity.");
-            }, 10000); // 10 seconds of no interaction
+            }, 10000); // 10 seconds pause
         }
-    
-        // Attach to user events
+
         window.addEventListener('keydown', pauseAutoRefresh);
         window.addEventListener('mousedown', pauseAutoRefresh);
         window.addEventListener('touchstart', pauseAutoRefresh);
-    
+
         setInterval(refreshMessages, refreshInterval * 1000);
         window.onload = refreshMessages;
     </script>
-    
 </head>
 <body class="container mt-4">
+
     {% if flash %}
     <div class="alert alert-{{ flash.type }} alert-dismissible fade show" role="alert">
         {{ flash.message }}
@@ -90,7 +91,7 @@
     </div>
     {% endif %}
 
-    <h1>Messages</h1>
+    <h1 class="mb-4">Telnyx SMS Inbox</h1>
 
     <div class="d-flex justify-content-between align-items-center mb-3">
         <a href="/send" class="btn btn-primary">Send New Message</a>
@@ -99,7 +100,7 @@
         </div>
     </div>
 
-    <table class="table table-striped">
+    <table class="table table-striped align-middle">
         <thead>
             <tr>
                 <th>ID</th>
@@ -108,6 +109,8 @@
                 <th>To</th>
                 <th>Body</th>
                 <th>Timestamp</th>
+                <th>Status</th>
+                <th>Cost</th>
                 <th>Action</th>
             </tr>
         </thead>
@@ -121,6 +124,25 @@
                 <td>{{ msg[4] }}</td>
                 <td>{{ msg[5] }}</td>
                 <td>
+                    {% if msg[6] == "sent" %}
+                        <span class="badge bg-success">Sent</span>
+                    {% elif msg[6] == "failed" %}
+                        <span class="badge bg-danger">Failed</span>
+                        {% if msg[7] %}
+                        <div class="small text-danger mt-1">{{ msg[7] }}</div>
+                        {% endif %}
+                    {% else %}
+                        <span class="badge bg-secondary">Unknown</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if msg[8] %}
+                        ${{ "%.4f"|format(float(msg[8])) }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
                     {% if msg[1] == "outgoing" and msg[6] == "failed" %}
                     <a href="/resend/{{ msg[0] }}" class="btn btn-sm btn-warning">Resend</a>
                     {% endif %}
@@ -129,5 +151,6 @@
             {% endfor %}
         </tbody>
     </table>
+
 </body>
 </html>

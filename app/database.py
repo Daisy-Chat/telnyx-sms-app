@@ -14,19 +14,20 @@ def init_db():
             body TEXT,
             timestamp TEXT,
             status TEXT DEFAULT 'unknown',
-            error_message TEXT DEFAULT NULL
+            error_message TEXT DEFAULT NULL,
+            cost TEXT DEFAULT NULL
         )
     ''')
     conn.commit()
     conn.close()
 
-def save_message(direction, from_number, to_number, body, timestamp, status="unknown", error_message=None):
+def save_message(direction, from_number, to_number, body, timestamp, status="unknown", error_message=None, cost=None):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO messages (direction, from_number, to_number, body, timestamp, status, error_message)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (direction, from_number, to_number, body, timestamp, status, error_message))
+        INSERT INTO messages (direction, from_number, to_number, body, timestamp, status, error_message, cost)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (direction, from_number, to_number, body, timestamp, status, error_message, cost))
     conn.commit()
     conn.close()
 
