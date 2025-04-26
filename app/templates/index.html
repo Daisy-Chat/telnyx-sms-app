@@ -47,10 +47,21 @@
                     <td>{{ msg[3] }}</td>
                     <td>{{ msg[4] }}</td>
                     <td>{{ msg[5] }}</td>
-                    <td>{{ msg[6] }}</td>
+                    <td>
+                        {% if msg[6] == 'sent' %}
+                            <span class="badge bg-primary">sent</span>
+                        {% elif msg[6] == 'received' %}
+                            <span class="badge bg-success">received</span>
+                        {% elif msg[6] == 'failed' %}
+                            <span class="badge bg-danger">failed</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ msg[6] }}</span>
+                        {% endif %}
+                    </td>
                     <td>{{ msg[7] or '-' }}</td>
-                    <td class="text-end">{{ msg[8] or '-' }}</td> <!-- Cost nicely right-aligned -->
+                    <td class="text-end">{{ msg[8] or '-' }}</td>
                 </tr>
+                
                 {% endfor %}
             </tbody>
         </table>
