@@ -16,6 +16,7 @@ from database import init_db, save_message, DB_FILE
 load_dotenv()
 
 # Configurations from .env
+APP_VERSION = os.getenv("APP_VERSION", "dev")  # fallback to 'dev' if missing
 APP_USERNAME = os.getenv("APP_USERNAME")
 APP_PASSWORD = os.getenv("APP_PASSWORD")
 TELNYX_API_KEY = os.getenv("TELNYX_API_KEY")
@@ -79,7 +80,7 @@ async def inbox(request: Request, user: str | RedirectResponse = Depends(get_cur
     cursor.execute("SELECT * FROM messages ORDER BY id DESC")
     messages = cursor.fetchall()
     conn.close()
-    return templates.TemplateResponse("index.html", {"request": request, "messages": messages, "flash": flash, "refresh_interval": REFRESH_INTERVAL_SECONDS})
+    return templates.TemplateResponse("index.html", {"request": request, "messages": messages, "flash": flash, "refresh_interval": REFRESH_INTERVAL_SECONDS, "app_version": APP_VERSION})
 
 @app.get("/send")
 async def send_page(request: Request, user: str | RedirectResponse = Depends(get_current_user)):
@@ -87,7 +88,7 @@ async def send_page(request: Request, user: str | RedirectResponse = Depends(get
         return user
 
     flash = request.session.pop('flash', None)
-    return templates.TemplateResponse("send.html", {"request": request, "flash": flash})
+    return templates.TemplateResponse("send.html", {"request": request, "flash": flash, "app_version": APP_VERSION})
 
 @app.post("/send-sms")
 async def send_sms(request: Request, to: str = Form(...), message: str = Form(...), user: str | RedirectResponse = Depends(get_current_user)):
