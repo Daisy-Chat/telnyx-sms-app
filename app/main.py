@@ -52,7 +52,7 @@ def get_current_user(request: Request):
 @app.get("/login")
 async def login_page(request: Request):
     flash = request.session.pop('flash', None)
-    return templates.TemplateResponse("login.html", {"request": request, "flash": flash})
+    return templates.TemplateResponse("login.html", {"request": request, "flash": flash, "app_version": APP_VERSION})
 
 @app.post("/login")
 async def login_submit(request: Request, username: str = Form(...), password: str = Form(...)):
