@@ -2,6 +2,8 @@
 
 A lightweight, containerized, secure web app to **send and receive SMS messages** through the [Telnyx Messaging API](https://developers.telnyx.com/docs/messaging).
 
+![App Screenshot](preview.png)
+
 - Built with [FastAPI](https://fastapi.tiangolo.com/)  
 - Fully Dockerized  
 - Secure HTTP Basic Auth  
