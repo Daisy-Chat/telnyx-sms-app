@@ -6,38 +6,23 @@ A lightweight, containerized, secure web app to **send and receive SMS messages*
 
 - Built with [FastAPI](https://fastapi.tiangolo.com/)  
 - Fully Dockerized  
-- Secure HTTP Basic Auth  
-- Webhook signature validation  
-- Bootstrap 5 clean UI  
-- Resend failed SMS
-
----
-
-## Features
-
-- Send SMS from web UI
+- Secure Login
 - Receive incoming SMS via Telnyx webhook
+- Resend failed SMS
 - Store incoming and outgoing messages in SQLite
 - Resend failed outgoing messages
 - Auto-refresh inbox view
-- HTTP Basic Auth protected UI
 - Signature verification for secure webhooks
 - Flash alerts for success/error
-- Easy Docker Compose deployment
-
----
 
 ## Requirements
 
-- Docker Engine
-- Docker Compose
+- Docker with Docker Compose
 - Telnyx Messaging Profile with:
   - API Key
   - Messaging Profile ID
   - Webhook URL configured
   - Webhook Public Key
-
----
 
 ## Environment Variables (`.env`)
 
@@ -103,31 +88,7 @@ All incoming webhooks are **signature verified** for security.
 | `GET` | `/` | Web inbox view |
 | `GET` | `/send` | Form to compose/send SMS |
 
-_All endpoints are protected by HTTP Basic Auth except `/webhook`._
-
-## Security Notes
-
-- All inbound webhooks are validated using Ed25519 signature verification.
-- All frontend access requires Basic Auth.
-- Sessions are secured with a secret key.
-- SQLite database is volume-mounted for persistence.
-
-## Troubleshooting
-
-| Problem | Solution |
-| ------- | -------- |
-| Cannot login | Check `APP_USERNAME` and `APP_PASSWORD` in `.env` |
-| Webhooks not working | Ensure public webhook URL is reachable and correct |
-| Messages not appearing | Check Docker logs (`docker-compose logs`) |
-| Signature validation fails | Verify correct `TELNYX_PUBLIC_KEY` |
-
-## Deployment Tips
-
-- Use a reverse proxy like **Nginx** to serve over **HTTPS**.
-- Expose only necessary ports.
-- Store `.env` securely (never commit it).
-- Rotate Telnyx API keys periodically.
-- Adjust `REFRESH_INTERVAL_SECONDS` to tune refresh load.
+_All endpoints are protected by Auth except `/webhook`._
 
 ## License
 
