@@ -153,7 +153,28 @@ async def send_sms(request: Request, to: str = Form(...), message: str = Form(..
 @app.post("/webhook")
 async def webhook(request: Request):
     payload = await request.json()
-    # Future delivery status updates can be handled here
+    event_type = payload.get("data", {}).get("event_type")
+    message_data = payload.get("data", {}).get("payload", {})
+
+    if event_type == "message.received":
+        from_number = message_data.get("from", {}).get("phone_number")
+        to_number = message_data.get("to", [{}])[0].get("phone_number")
+        text = message_data.get("text")
+        timestamp = message_data.get("received_at", datetime.utcnow().isoformat())
+
+        cost_info = message_data.get("cost", {})
+        cost = cost_info.get("amount") if isinstance(cost_info, dict) else None
+
+        save_message(
+            direction="incoming",
+            from_number=from_number,
+            to_number=to_number,
+            body=text,
+            timestamp=timestamp,
+            status="received",
+            cost=cost
+        )
+
     return {"status": "ok"}
 
 @app.get("/messages")
