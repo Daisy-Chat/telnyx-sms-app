@@ -6,6 +6,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: telnyx_sms_app:${APP_VERSION}
     env_file:
       - .env
     ports:
