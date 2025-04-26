@@ -164,7 +164,15 @@ async def webhook(request: Request):
         timestamp = message_data.get("received_at", datetime.utcnow().isoformat())
 
         cost_info = message_data.get("cost", {})
-        cost = cost_info.get("amount") if isinstance(cost_info, dict) else None
+        if isinstance(cost_info, dict):
+            amount = cost_info.get("amount")
+            currency = cost_info.get("currency")
+            if amount and currency:
+                cost = f"{amount} {currency}"
+            else:
+                cost = None
+        else:
+            cost = None
 
         save_message(
             direction="incoming",
