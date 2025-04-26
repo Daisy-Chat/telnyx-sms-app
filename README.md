@@ -37,15 +37,15 @@ A lightweight, containerized, secure web app to **send and receive SMS messages*
 
 ---
 
-## Environment Variables (`stack.env`)
+## Environment Variables (`.env`)
 
-Copy the example file (called `stack.env` to make it simple for Portainer):
+Copy the example file:
 
 ```bash
-cp stack.env.example stack.env
+cp .env.example .env
 ```
 
-Edit stack.env and configure:
+Edit .env and configure:
 
 | Variable | Description |
 | -------- | ----------- |
@@ -60,7 +60,7 @@ Edit stack.env and configure:
 
 ## Build and Run
 
-1. Build:
+1. Clone and Build:
 
 ```bash
 docker-compose build
@@ -70,7 +70,7 @@ docker-compose up
 1. Access the app:
 
 - Navigate to: http://localhost:8400/
-- Login using your username and password from `stack.env`
+- Login using your username and password from `.env`
 
 ## Telnyx Webhook Configuration
 
@@ -86,7 +86,7 @@ In the Telnyx Portal:
 
     _(Note: If running locally, use ngrok or similar tool to expose your port.)_
 
-1. Copy your **Webhook Public Key** and set it in your `stack.env`.
+1. Copy your **Webhook Public Key** and set it in your `.env`.
 
 All incoming webhooks are **signature verified** for security.
 
@@ -114,7 +114,7 @@ _All endpoints are protected by HTTP Basic Auth except `/webhook`._
 
 | Problem | Solution |
 | ------- | -------- |
-| Cannot login | Check `APP_USERNAME` and `APP_PASSWORD` in `stack.env` |
+| Cannot login | Check `APP_USERNAME` and `APP_PASSWORD` in `.env` |
 | Webhooks not working | Ensure public webhook URL is reachable and correct |
 | Messages not appearing | Check Docker logs (`docker-compose logs`) |
 | Signature validation fails | Verify correct `TELNYX_PUBLIC_KEY` |
@@ -123,7 +123,7 @@ _All endpoints are protected by HTTP Basic Auth except `/webhook`._
 
 - Use a reverse proxy like **Nginx** to serve over **HTTPS**.
 - Expose only necessary ports.
-- Store `stack.env` securely (never commit it).
+- Store `.env` securely (never commit it).
 - Rotate Telnyx API keys periodically.
 - Adjust `REFRESH_INTERVAL_SECONDS` to tune refresh load.
 

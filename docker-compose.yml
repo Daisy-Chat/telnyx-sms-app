@@ -3,12 +3,12 @@ version: "3.9"
 services:
   sms-app:
     container_name: sms-app
-    build:
+    build:  # delete this build section for Portainer
       context: .
       dockerfile: Dockerfile
     image: telnyx_sms_app:${APP_VERSION}
     env_file:
-      - stack.env  # make it usable for Portainer
+      - .env  # For Portainer use stack.env
     ports:
       - "8400:8000"  # External 8400 -> Internal 8000
     volumes:
