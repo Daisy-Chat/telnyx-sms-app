@@ -37,15 +37,15 @@ A lightweight, containerized, secure web app to **send and receive SMS messages*
 
 ---
 
-## ⚙️ Environment Variables (`.env`)
+## Environment Variables (`stack.env`)
 
-Copy the example file:
+Copy the example file (called `stack.env` to make it simple for Portainer):
 
 ```bash
-cp .env.example .env
+cp stack.env.example stack.env
 ```
 
-Edit .env and configure:
+Edit stack.env and configure:
 
 | Variable | Description |
 | -------- | ----------- |
@@ -60,10 +60,9 @@ Edit .env and configure:
 
 ## Build and Run
 
-1. Clone and Build:
+1. Build:
 
 ```bash
-cp .env.example .env # Edit .env with real credentials
 docker-compose build
 docker-compose up
 ```
@@ -71,7 +70,7 @@ docker-compose up
 1. Access the app:
 
 - Navigate to: http://localhost:8400/
-- Login using your username and password from `.env`
+- Login using your username and password from `stack.env`
 
 ## Telnyx Webhook Configuration
 
@@ -87,7 +86,7 @@ In the Telnyx Portal:
 
     _(Note: If running locally, use ngrok or similar tool to expose your port.)_
 
-1. Copy your **Webhook Public Key** and set it in your `.env`.
+1. Copy your **Webhook Public Key** and set it in your `stack.env`.
 
 All incoming webhooks are **signature verified** for security.
 
@@ -115,7 +114,7 @@ _All endpoints are protected by HTTP Basic Auth except `/webhook`._
 
 | Problem | Solution |
 | ------- | -------- |
-| Cannot login | Check `APP_USERNAME` and `APP_PASSWORD` in `.env` |
+| Cannot login | Check `APP_USERNAME` and `APP_PASSWORD` in `stack.env` |
 | Webhooks not working | Ensure public webhook URL is reachable and correct |
 | Messages not appearing | Check Docker logs (`docker-compose logs`) |
 | Signature validation fails | Verify correct `TELNYX_PUBLIC_KEY` |
@@ -124,7 +123,7 @@ _All endpoints are protected by HTTP Basic Auth except `/webhook`._
 
 - Use a reverse proxy like **Nginx** to serve over **HTTPS**.
 - Expose only necessary ports.
-- Store `.env` securely (never commit it).
+- Store `stack.env` securely (never commit it).
 - Rotate Telnyx API keys periodically.
 - Adjust `REFRESH_INTERVAL_SECONDS` to tune refresh load.
 
