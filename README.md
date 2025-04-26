@@ -70,7 +70,7 @@ docker-compose up
 
 1. Access the app:
 
-- Navigate to: http://localhost:8000/
+- Navigate to: http://localhost:8400/
 - Login using your username and password from `.env`
 
 ## Telnyx Webhook Configuration

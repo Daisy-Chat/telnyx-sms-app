@@ -1,72 +1,99 @@
 import os
-import base64
-import nacl.signing
-import nacl.encoding
+import sqlite3
 from datetime import datetime
-
-from fastapi import FastAPI, Request, Form, Depends, HTTPException, status
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi import FastAPI, Request, Form, HTTPException, Depends
+from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 import httpx
+from starlette.status import HTTP_303_SEE_OTHER, HTTP_401_UNAUTHORIZED
 from dotenv import load_dotenv
 
-from database import init_db, save_message, get_all_messages
+from database import init_db, save_message, DB_FILE
 
+# Load environment variables
 load_dotenv()
-init_db()
 
+# Configurations from .env
+APP_USERNAME = os.getenv("APP_USERNAME")
+APP_PASSWORD = os.getenv("APP_PASSWORD")
 TELNYX_API_KEY = os.getenv("TELNYX_API_KEY")
 TELNYX_MESSAGING_PROFILE_ID = os.getenv("TELNYX_MESSAGING_PROFILE_ID")
 TELNYX_FROM_NUMBER = os.getenv("TELNYX_FROM_NUMBER")
 TELNYX_PUBLIC_KEY = os.getenv("TELNYX_PUBLIC_KEY")
-
-APP_USERNAME = os.getenv("APP_USERNAME")
-APP_PASSWORD = os.getenv("APP_PASSWORD")
-SESSION_SECRET = os.getenv("SESSION_SECRET", "supersecret_session_key")
+SESSION_SECRET = os.getenv("SESSION_SECRET")
 REFRESH_INTERVAL_SECONDS = int(os.getenv("REFRESH_INTERVAL_SECONDS", "10"))
 
+# Initialize App
 app = FastAPI()
-security = HTTPBasic()
-templates = Jinja2Templates(directory="templates")
-app.mount("/static", StaticFiles(directory="static"), name="static")
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
 
-def authenticate(credentials: HTTPBasicCredentials = Depends(security)):
-    if credentials.username != APP_USERNAME or credentials.password != APP_PASSWORD:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Basic"},
-        )
+templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-def verify_telnyx_signature(signature: str, timestamp: str, body: bytes):
-    if not TELNYX_PUBLIC_KEY:
-        raise Exception("TELNYX_PUBLIC_KEY is not set.")
+# Initialize Database
+init_db()
 
-    message = timestamp.encode() + body
-    verify_key = nacl.signing.VerifyKey(TELNYX_PUBLIC_KEY, encoder=nacl.encoding.Base64Encoder)
+# --- Session Authentication Middleware ---
+def get_current_user(request: Request):
+    if not request.session.get('user'):
+        request.session['flash'] = {
+            "type": "warning",
+            "message": "Session expired. Please log in again."
+        }
+        request.session['next_url'] = str(request.url.path)
+        return RedirectResponse("/login", status_code=303)
+    return request.session['user']
 
-    try:
-        verify_key.verify(message, base64.b64decode(signature))
-        return True
-    except Exception:
-        return False
+# --- Routes ---
 
-@app.get("/", response_class=HTMLResponse)
-async def read_messages(request: Request, credentials: HTTPBasicCredentials = Depends(authenticate)):
-    messages = get_all_messages()
+@app.get("/login")
+async def login_page(request: Request):
     flash = request.session.pop('flash', None)
+    return templates.TemplateResponse("login.html", {"request": request, "flash": flash})
+
+@app.post("/login")
+async def login_submit(request: Request, username: str = Form(...), password: str = Form(...)):
+    if username == APP_USERNAME and password == APP_PASSWORD:
+        request.session['user'] = username
+        next_url = request.session.pop('next_url', '/')
+        return RedirectResponse(next_url, status_code=HTTP_303_SEE_OTHER)
+    else:
+        request.session['flash'] = {"type": "danger", "message": "Invalid login"}
+        return RedirectResponse("/login", status_code=HTTP_303_SEE_OTHER)
+
+@app.get("/logout")
+async def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse("/login", status_code=HTTP_303_SEE_OTHER)
+
+@app.get("/")
+async def inbox(request: Request, user: str | RedirectResponse = Depends(get_current_user)):
+    if isinstance(user, RedirectResponse):
+        return user
+
+    flash = request.session.pop('flash', None)
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM messages ORDER BY id DESC")
+    messages = cursor.fetchall()
+    conn.close()
     return templates.TemplateResponse("index.html", {"request": request, "messages": messages, "flash": flash, "refresh_interval": REFRESH_INTERVAL_SECONDS})
 
-@app.get("/send", response_class=HTMLResponse)
-async def send_form(request: Request, credentials: HTTPBasicCredentials = Depends(authenticate)):
-    return templates.TemplateResponse("send.html", {"request": request})
+@app.get("/send")
+async def send_page(request: Request, user: str | RedirectResponse = Depends(get_current_user)):
+    if isinstance(user, RedirectResponse):
+        return user
+
+    flash = request.session.pop('flash', None)
+    return templates.TemplateResponse("send.html", {"request": request, "flash": flash})
 
 @app.post("/send-sms")
-async def send_sms(request: Request, to: str = Form(...), message: str = Form(...), credentials: HTTPBasicCredentials = Depends(authenticate)):
+async def send_sms(request: Request, to: str = Form(...), message: str = Form(...), user: str | RedirectResponse = Depends(get_current_user)):
+    if isinstance(user, RedirectResponse):
+        return user
+
     url = "https://api.telnyx.com/v2/messages"
     headers = {
         "Authorization": f"Bearer {TELNYX_API_KEY}",
@@ -94,7 +121,15 @@ async def send_sms(request: Request, to: str = Form(...), message: str = Form(..
         except Exception:
             cost = None
 
-        save_message("outgoing", TELNYX_FROM_NUMBER, to, message, datetime.utcnow().isoformat(), status="sent", cost=cost)
+        save_message(
+            "outgoing",
+            TELNYX_FROM_NUMBER,
+            to,
+            message,
+            datetime.utcnow().isoformat(),
+            status="sent",
+            cost=cost
+        )
         request.session['flash'] = {"type": "success", "message": "Message sent successfully!"}
     else:
         try:
@@ -102,72 +137,51 @@ async def send_sms(request: Request, to: str = Form(...), message: str = Form(..
         except Exception:
             error_detail = response.text or "Unknown send error"
 
-        save_message("outgoing", TELNYX_FROM_NUMBER, to, message, datetime.utcnow().isoformat(), status="failed", error_message=error_detail)
+        save_message(
+            "outgoing",
+            TELNYX_FROM_NUMBER,
+            to,
+            message,
+            datetime.utcnow().isoformat(),
+            status="failed",
+            error_message=error_detail
+        )
         request.session['flash'] = {"type": "danger", "message": f"Failed to send message: {error_detail}"}
 
-    return RedirectResponse("/", status_code=303)
-
+    return RedirectResponse("/", status_code=HTTP_303_SEE_OTHER)
 
 @app.post("/webhook")
 async def webhook(request: Request):
     payload = await request.json()
-
-    event_type = payload.get("data", {}).get("event_type")
-    message_id = payload.get("data", {}).get("id")
-    cost = payload.get("data", {}).get("cost")
-
-    if event_type in ["message.delivery.successful", "message.delivery.failed"]:
-        # Here you can UPDATE your database
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-
-        if cost:
-            cursor.execute("UPDATE messages SET cost = ? WHERE id = ?", (cost, message_id))
-            conn.commit()
-        conn.close()
-
+    # Future delivery status updates can be handled here
     return {"status": "ok"}
 
 @app.get("/messages")
-async def api_messages(credentials: HTTPBasicCredentials = Depends(authenticate)):
-    messages = get_all_messages()
-    return JSONResponse(content={"messages": messages})
+async def get_messages(request: Request, user: str | RedirectResponse = Depends(get_current_user)):
+    if isinstance(user, RedirectResponse):
+        return user
+
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM messages ORDER BY id DESC")
+    messages = cursor.fetchall()
+    conn.close()
+    return {"messages": messages}
 
 @app.get("/resend/{message_id}")
-async def resend_message(request: Request, message_id: int, credentials: HTTPBasicCredentials = Depends(authenticate)):
-    messages = get_all_messages()
-    message = next((m for m in messages if m[0] == message_id and m[1] == "outgoing"), None)
+async def resend_message(message_id: int, request: Request, user: str | RedirectResponse = Depends(get_current_user)):
+    if isinstance(user, RedirectResponse):
+        return user
 
-    if not message:
-        request.session['flash'] = {"type": "danger", "message": "Message not found or not eligible for resend."}
-        return RedirectResponse("/", status_code=303)
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT to_number, body FROM messages WHERE id = ?", (message_id,))
+    row = cursor.fetchone()
+    conn.close()
 
-    to_number = message[3]
-    body_text = message[4]
+    if not row:
+        request.session['flash'] = {"type": "danger", "message": "Message not found"}
+        return RedirectResponse("/", status_code=HTTP_303_SEE_OTHER)
 
-    url = "https://api.telnyx.com/v2/messages"
-    headers = {
-        "Authorization": f"Bearer {TELNYX_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "from": TELNYX_FROM_NUMBER,
-        "to": to_number,
-        "text": body_text,
-        "messaging_profile_id": TELNYX_MESSAGING_PROFILE_ID
-    }
-
-    async with httpx.AsyncClient() as client:
-        response = await client.post(url, json=payload, headers=headers)
-
-    if response.status_code in [200, 202]:
-        request.session['flash'] = {"type": "success", "message": "Resent message successfully!"}
-    else:
-        try:
-            error_detail = response.json().get('errors', [{}])[0].get('detail', response.text)
-        except Exception:
-            error_detail = response.text
-
-        request.session['flash'] = {"type": "danger", "message": f"Failed to resend message: {error_detail}"}
-
-    return RedirectResponse("/", status_code=303)
+    to, body = row
+    return await send_sms(request, to=to, message=body, user=user)
